@@ -1,0 +1,62 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(dlookr)
+library(naniar)
+library(palmerpenguins)
+```
+# 1. Loading DATA
+```{r}
+dt <- penguins
+head(dt)
+```
+```{r}
+summary(overview(dt))
+```
+
+
+# split data
+```{r}
+plot_na_intersect(dt)
+find_na(dt)
+```
+
+```{r}
+dt[find_na(dt), ]
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,181 +1,161 @@
----
-title: "R Notebook"
-output: html_notebook
----
 
-```{r}
+
+# 0. packages
 library(tidyverse)
 library(tidymodels)
 library(dlookr)
 library(naniar)
 library(palmerpenguins)
-```
+
 # 1. Loading  DATA
-palmerpenguins package의 penguins 데이터를 분석 예제에 사용함
-```{r}
+#. palmerpenguins package의 penguins 데이터를 분석 예제에 사용함
+
 dt <- penguins
 head(dt, 10)
-```
+
 # 2. Overview data using dlookr packages
 ## overview
-```{r}
+
 summary(overview(dt))
-```
-```{r}
+
 dt %>%
   diagnose_numeric() 
 dt %>%
   diagnose_category()
-```
 ## check NA
-```{r}
 naniar::gg_miss_upset(dt)
-```
-```{r}
 dlookr::plot_na_pareto(dt)
-```
-NA가 관측치의 5% 이내로 보이므로 삭제하여 처리하겟습니다.
-```{r}
+
+#. NA가 관측치의 5% 이내로 보이므로 삭제하여 처리하겟습니다.
 dt_all <- dt %>% na.omit()
-```
 # data for model
 ## recipe
-```{r}
 dt_recipe <- 
     recipe(sex ~ .,
            data = dt_all) %>% 
     step_mutate(year = factor(year)) %>% 
-    prep(training = dt_all)
+    prep(training = dt_train)
 dt_recipe
-```
-## bake dt_train
-```{r}
-dt_juiced <- juice(dt_recipe)
-```
-## split data
-```{r}
-set.seed(123)
 
+## bake dt_train
+dt_juiced <- juice(dt_recipe)
+## split data
+set.seed(123)
 split <- initial_split(dt_juiced, strata = sex)
 dt_train <- training(split)
 dt_test <- testing(split)
-```
+
 
 # model
 ## 1. knn
-```{r}
 library(kknn)
-# make a knn spec
+#. make a knn spec
 knn_spec <- nearest_neighbor() %>% 
   set_engine("kknn") %>% 
   set_mode("classification")
 
-#fit knn nodel
+#. fit knn nodel
 knn_fit <- knn_spec %>% 
   fit(sex ~., data = dt_juiced)
 knn_fit
 
-# predict
+#. predict
 knn_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 
 ## 2. Decision Tree
-```{r}
-# make a Decision Tree spec
+#. make a Decision Tree spec
 dctree_spec <- decision_tree() %>% 
   set_engine("rpart") %>% 
   set_mode("classification")
 
-#fit Decision Tree nodel
+#. fit Decision Tree nodel
 dctree_fit <- dctree_spec %>% 
   fit(sex ~., data = dt_juiced)
 dctree_fit
 
-# predict
+#. predict
 dctree_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 ## 3. ANN(Artificial Neural Network)
-```{r}
-# make a mlp spec
+#. make a mlp spec
 mlp_spec <- mlp() %>% 
   set_engine("nnet") %>% 
   set_mode("classification")
 
-#fit mlp nodel
+#. fit mlp nodel
 mlp_fit <- mlp_spec %>% 
   fit(sex ~., data = dt_juiced)
 mlp_fit
 
-# predict
+#. predict
 mlp_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 ## 4. SVM(Support Vector Machine)
-```{r}
 library(kernlab)
-# make a SVM spec
+#. make a SVM spec
 svm_spec <- svm_linear() %>% 
   set_engine("kernlab") %>% 
   set_mode("classification")
 
-#fit SVM nodel
+#. fit SVM nodel
 svm_fit <- svm_spec %>% 
   fit(sex ~., data = dt_juiced)
 svm_fit
 
-# predict
+#. predict
 svm_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 ## 5.Random Forest
-```{r}
+
 library(randomForest)
-# make a randomForest spec
+#. make a randomForest spec
 randomForest_spec <- rand_forest() %>% 
   set_engine("randomForest") %>% 
   set_mode("classification")
 
-#fit randomForest nodel
+#.fit randomForest nodel
 randomForest_fit <- randomForest_spec %>% 
   fit(sex ~., data = dt_juiced)
 randomForest_fit
 
-# predict
+#. predict
 randomForest_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 
 ## 6.Naive Beyes
-```{r}
 library(klaR)
-# make a Naive Beyes spec
+#. make a Naive Beyes spec
 nb_spec <- naive_Bayes() %>% 
   set_engine("klaR") %>% 
   set_mode("classification")
 
-#fit Naive Beyes nodel
+#. fit Naive Beyes nodel
 nb_fit <- nb_spec %>% 
   fit(sex ~., data = dt_juiced)
 nb_fit
 
-# predict
+#. predict
 nb_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
-```
+
 
 
 

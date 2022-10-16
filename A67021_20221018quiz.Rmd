@@ -79,7 +79,11 @@ knn_fit
 knn_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
-  conf_mat(truth = sex, estimate = .pred_class)
+  conf_mat(truth = sex, estimate = .pred_class) 
+knn_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 
 ## 2. Decision Tree
@@ -99,6 +103,10 @@ dctree_fit %>%
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
+dctree_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 ## 3. ANN(Artificial Neural Network)
 ```{r}
@@ -117,6 +125,10 @@ mlp_fit %>%
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
+mlp_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 ## 4. SVM(Support Vector Machine)
 ```{r}
@@ -136,9 +148,13 @@ svm_fit %>%
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
+svm_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 ## 5.Random Forest
-```{r}
+```{r, warning=FALSE}
 library(randomForest)
 # make a randomForest spec
 randomForest_spec <- rand_forest() %>% 
@@ -155,10 +171,14 @@ randomForest_fit %>%
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
+randomForest_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 
 ## 6.Naive Beyes
-```{r}
+```{r, warning=FALSE}
 library(klaR)
 # make a Naive Beyes spec
 nb_spec <- naive_Bayes() %>% 
@@ -169,12 +189,15 @@ nb_spec <- naive_Bayes() %>%
 nb_fit <- nb_spec %>% 
   fit(sex ~., data = dt_juiced)
 nb_fit
-
 # predict
 nb_fit %>% 
   predict(dt_test) %>% 
   bind_cols(dt_test) %>%
   conf_mat(truth = sex, estimate = .pred_class)
+nb_fit %>% 
+  predict(dt_test) %>% 
+  bind_cols(dt_test) %>%
+  accuracy(truth = sex, estimate = .pred_class)
 ```
 
 

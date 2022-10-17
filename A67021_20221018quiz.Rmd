@@ -108,6 +108,13 @@ dctree_fit %>%
   bind_cols(dt_test) %>%
   accuracy(truth = sex, estimate = .pred_class)
 ```
+```{r}
+#. Decision Tree plot
+library(rpart.plot)
+rpart.plot(dctree_fit$fit)
+```
+
+
 ## 3. ANN(Artificial Neural Network)
 ```{r}
 # make a mlp spec

@@ -1,0 +1,117 @@
+---
+title: "ARIMA"
+output: html_notebook
+---
+# 0. packages
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(fpp3)
+library(tidyquant)
+```
+
+# 1. data : KO aka CokaCola
+## ㅏ get data : KO aka CokaCola
+```{r}
+tq_get_options()
+```
+
+```{r}
+tq_coke <- tq_get("KO",
+                  get  = "stock.prices",
+                  from = "1950-01-01",
+                  to   = "2022-11-01")
+```
+
+```{r}
+tq_coke
+```
+
+## ㅏ data processing for tm seriese in fpp3 package : as tsibble
+```{r}
+tq_coke_tsbl <-
+tq_coke %>%
+  as_tsibble(key = c(symbol),
+             index = date)
+
+tq_coke_tsbl
+```
+```{r}
+tq_coke_tsbl %>%
+  ggplot(aes(x = date, y = close)) +
+  geom_path() 
+```
+```{r}
+library(quantmod)
+
+tq_coke_tsbl %>%
+  as.xts() %>%
+  chart_Series()
+
+```
+
+## ㅏ handling non-trading days
+### ... Fill non-trading days with missing values
+```{r}
+tq_coke_tsbl %>%
+  fill_gaps() %>% 
+  gg_tsdisplay(close, plot_type = "partial")
+```
+### ... Fill non-trading days with the last observed values
+```{r}
+tq_coke_tsbl %>%
+  fill_gaps() %>% 
+  tidyr::fill(close, .direction = "down") %>%
+  gg_tsdisplay(close, plot_type = "partial")
+```
+
+
+# ARIMA
+### ... ARIMA Fill non-trading days with missing values
+```{r}
+tq_coke_tsbl %>%
+  fill_gaps() %>% # 비거래일 데이터를 na로 처리하여 모델에 넣는다
+  model(search = ARIMA(close, stepwise = TRUE)) %>%
+  report() %>%
+  tidy()
+```
+### ... ARIMA Fill non-trading days with the last observed values
+```{r}
+tq_coke_tsbl %>%
+  fill_gaps() %>% 
+  tidyr::fill(close, .direction = "down") %>%
+  model(search = ARIMA(close, stepwise = TRUE)) %>%
+  report() %>%
+  tidy()
+```
+```{r}
+fit_arima_tidyfill <-
+tq_coke_tsbl %>%
+  fill_gaps() %>% 
+  tidyr::fill(close, .direction = "down") %>%
+  model(search = ARIMA(close)) 
+
+fit_arima_tidyfill %>%
+  select(search) %>%
+  report()
+fit_arima_tidyfill %>%
+  select(search) %>% 
+  gg_tsresiduals()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

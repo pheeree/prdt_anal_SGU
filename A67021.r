@@ -9,13 +9,11 @@ library(palmerpenguins)
 
 # 1. Loading  DATA
 #. palmerpenguins package의 penguins 데이터를 분석 예제에 사용함
-
 dt <- penguins
 head(dt, 10)
 
 # 2. Overview data using dlookr packages
 ## overview
-
 summary(overview(dt))
 
 dt %>%
@@ -119,7 +117,6 @@ svm_fit %>%
   conf_mat(truth = sex, estimate = .pred_class)
 
 ## 5.Random Forest
-
 library(randomForest)
 #. make a randomForest spec
 randomForest_spec <- rand_forest() %>% 

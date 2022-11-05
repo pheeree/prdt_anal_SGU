@@ -1,0 +1,196 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# 0. packages
+```{r}
+#. 시계열 분석 모델링을
+library(tidyverse)
+library(tidymodels)
+library(modeltime)
+library(forecast)
+#. 시계열 데이터 처리
+library(tsibble)
+library(lubridate)
+library(timetk)
+library(tibbletime)
+library(timetk)
+#. 주식 데이터 로드
+library(tidyquant)
+#. Visualization
+library(ggthemes)
+
+theme_set(theme_bw())
+```
+
+# 1. data : KO aka CokaCola
+## ㅏ get data : KO aka CokaCola
+```{r}
+tq_coke <- tq_get("KO",
+                  get  = "stock.prices",
+                  from = "2000-01-01",
+                  to   = Sys.time()) #. for up to date
+head(tq_coke)
+tail(tq_coke)
+```
+
+## ㅏ handling non-trading days
+```{r}
+tq_coke_tsbl <-
+tq_coke %>%
+  as_tsibble(key = c(symbol),
+             index = date)
+#. 주식 비거래일 종가를 직전 종가로 설정
+tq_coke_tsbl <-
+  tq_coke_tsbl %>%
+  select(symbol, date, close) %>%
+  fill_gaps() %>% 
+  tidyr::fill(close, .direction = "down")
+#. modeltime 패키지를 위한 데이터 형식을 tibble로 설정
+tq_coke_tsbl <- as.tibble(tq_coke_tsbl)
+```
+
+## ㅏ split data: Train / Test
+```{r}
+splits <- tq_coke_tsbl %>% time_series_split(assess = "12 month", cumulative = TRUE)
+#. 검증 개요를 plot
+splits %>% 
+    tk_time_series_cv_plan() %>% 
+    plot_time_series_cv_plan(date, close,
+                             .interact = FALSE, 
+                             .title = "Partition Train / Test")
+```
+#. 3 model
+## ㅏ AutoArima를 통한 모델 탐색
+```{r}
+#. auto ARIMA를 이용해 적절한 파라미터를 탐색한다 
+#. trace = TRUE 옵션을 사용하면 탐색 중인 모델을 볼 수 있다
+model_fit_arima_trace <- modeltime::arima_reg() %>%
+  parsnip::set_engine("auto_arima", trace = TRUE) %>%
+  parsnip::fit(close ~ date, 
+               data = training(splits)) %>%
+  capture.output()
+  
+```
+### ... 탐색한 모델을 AICc가 낮은 순으로 정렬
+```{r}
+model_fit_arima_trace 
+x <- model_fit_arima_trace[4:45]
+x <- textConnection(x) 
+tb_arima_trace_record <- read.table(x, sep = ":")
+colnames(tb_arima_trace_record) <- c("models", "AICc")
+tb_arima_trace_record %>%
+  arrange(AICc, desc = FALSE)
+```
+### ... AutoArima가 선택한 Best model
+```{r}
+model_fit_arima_trace[47:64]
+```
+## ㅏ AutoArima가 선택한 상위 3개 모델과 arima_boost 모델 접합
+```{r}
+#. ARIMA(2,1,4)(2,0,0)[7]
+model_fit_arima214200f <- modeltime::arima_reg(
+  seasonal_period          = 7,
+  non_seasonal_ar          = 2,
+  non_seasonal_differences = 1,
+  non_seasonal_ma          = 4,
+  seasonal_ar              = 2,
+  seasonal_differences     = 0,
+  seasonal_ma              = 0) %>%
+  parsnip::set_engine("arima", include.drift = FALSE) %>%
+  parsnip::fit(close ~ date, 
+               data = training(splits))
+#. ARIMA(2,1,4)(2,0,0)[7] with drift
+model_fit_arima214200t <- modeltime::arima_reg(
+  seasonal_period          = 7,
+  non_seasonal_ar          = 2,
+  non_seasonal_differences = 1,
+  non_seasonal_ma          = 4,
+  seasonal_ar              = 2,
+  seasonal_differences     = 0,
+  seasonal_ma              = 0) %>%
+  parsnip::set_engine("arima", include.drift = TRUE) %>%
+  parsnip::fit(close ~ date, 
+               data = training(splits))
+#. ARIMA(3,1,5)(2,0,0)[7]
+model_fit_arima315200f <- modeltime::arima_reg(
+  seasonal_period          = 7,
+  non_seasonal_ar          = 3,
+  non_seasonal_differences = 1,
+  non_seasonal_ma          = 5,
+  seasonal_ar              = 2,
+  seasonal_differences     = 0,
+  seasonal_ma              = 0) %>%
+  parsnip::set_engine("arima", include.drift = FALSE) %>%
+  parsnip::fit(close ~ date, 
+               data = training(splits))
+#. arima_boost model
+model_fit_arima_boost <- modeltime::arima_boost() %>%
+  parsnip::set_engine("auto_arima_xgboost") %>%
+  parsnip::fit(close ~ date + as.numeric(date) + month(date), 
+               data = training(splits))
+
+```
+
+## ㅏ 예측 워크플로우를 위해 modeltime_table 생성
+```{r}
+model_tbl <- modeltime::modeltime_table(
+    model_fit_arima214200f,
+    model_fit_arima214200t,
+    model_fit_arima315200f,
+    model_fit_arima_boost
+    )
+model_tbl
+```
+## ㅏ modeltime_table
+### ... test 데이터에 적합시켜서 보정
+```{r}
+calibration_tbl <- model_tbl %>%
+    modeltime::modeltime_calibrate(testing(splits)) 
+calibration_tbl
+```
+### ... visualization the forecast test
+```{r}
+calibration_tbl %>%
+    modeltime::modeltime_forecast(new_data = testing(splits), 
+                                  actual_data = tq_coke_tsbl,
+                                  conf_interval = 0.90) %>%
+    modeltime::plot_modeltime_forecast(.legend_show = TRUE, 
+                                       .legend_max_width = 20)
+```
+## ㅏ  Accuracy Metrics: rmse를 기준으로 평가
+```{r}
+calibration_tbl %>%
+  modeltime_accuracy() %>%
+  arrange(rmse, desc = FALSE)
+```
+## ㅏ refitting
+### ... train/test를 합한 original 데이터를 이용해서 refitting
+```{r}
+refit_tbl <- calibration_tbl %>%
+    modeltime::modeltime_refit(data = tq_coke_tsbl)
+```
+
+### ... forecast plot 
+```{r}
+forecast_tbl <- refit_tbl %>%
+    modeltime::modeltime_forecast(
+        h = "12 month",
+        actual_data = tq_coke_tsbl,
+        conf_interval = 0.90
+    ) 
+
+forecast_tbl %>%
+    modeltime::plot_modeltime_forecast(.interactive = TRUE,
+                                       .legend_max_width = 20)
+```
+
+# 최종 선택한 ARIMA(2,1,4)(2,0,0)[7] WITH DRIFT 모델의 예측 결과 출력
+```{r}
+forecast_tbl_fnl <- forecast_tbl %>%
+  subset(.model_id == "2") 
+
+forecast_tbl_fnl
+```
+
+
